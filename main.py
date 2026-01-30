@@ -10,12 +10,13 @@ from google.genai import types
 
 from dotenv import load_dotenv
 from modules.pdf_processor import render_page, get_total_pages
+import modules.logger as logger
 
 # 1. Load environment variables
 load_dotenv('../../etc/.env') # Adjust path if necessary, user provided '../../etc/.env'
 
 # 2. Configure Streamlit
-st.set_page_config(layout="wide", page_title="RAG v2 - Gemini File Search")
+st.set_page_config(layout="wide", page_title="업무 메뉴얼")
 
 # 3. Initialize Session State
 if "current_page" not in st.session_state:
@@ -28,6 +29,7 @@ if "pending_auto_jump" not in st.session_state:
     st.session_state.pending_auto_jump = None
 if "scroll_to_top" not in st.session_state:
     st.session_state.scroll_to_top = False
+
 
 # Check for pending auto-jump (must be done before widgets are rendered)
 if st.session_state.pending_auto_jump:
@@ -88,6 +90,22 @@ def jump_to_source(title: str, page: int, available_files: list):
         st.session_state.page_input = str(page)
     else:
         st.toast(f"Cannot find file: {title}")
+
+def handle_bad_feedback(log_id):
+    """Callback to handle bad feedback."""
+    # Toggle local state (optional, if we want to toggle back and forth)
+    # But user asked for "bad" button, usually it's a one-way set or toggle.
+    # Let's find the message in history and toggle it.
+    for msg in st.session_state.chat_history:
+        if msg.get("log_id") == log_id:
+            new_state = not msg.get("bad", False)
+            msg["bad"] = new_state
+            logger.update_log_feedback(log_id, new_state)
+            if new_state:
+                st.toast("Feedback recorded: Bad 👎")
+            else:
+                st.toast("Feedback undone.")
+            break
 
 # 5. Layout
 col1, col2 = st.columns([0.7, 1])
@@ -170,71 +188,33 @@ with col2:
     st.header("🤖 Daemini")
     
     with st.container(height=1500):
-        # Trigger auto-scroll for this container if flag is set
+        # Anchor for scrolling
+        st.markdown('<div id="chat_top_anchor"></div>', unsafe_allow_html=True)
+        
+        # Robust Scroll-to-Top JS
         if st.session_state.get("scroll_to_top"):
-            # This JS tries to find the second scrollable container (Index 1 usually matches the right column in 2-col layout)
-            # and scrolls it to top.
             js = '''
             <script>
-                var candidates = window
-                .parent.document.querySelectorAll('div[data-testid="stVerticalBlockBorderWrapper"]');
-                if (candidates.length > 1) {
-                    // Try to scroll the inner scrollable div of the second column container
-                    var target = candidates[1].querySelector('div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]');
-                    if (!target) {
-                         // Fallback: try finding any scrollable element within the second column wrapper
-                         target = candidates[1].querySelector('[data-testid="stVerticalBlock"]');
+                try {
+                    var anchor = window.parent.document.getElementById('chat_top_anchor');
+                    if (anchor) {
+                        var el = anchor;
+                        // Traverse up to find the scrollable container
+                        while (el && el !== window.parent.document.body) {
+                            var style = window.getComputedStyle(el);
+                            if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+                                el.scrollTop = 0;
+                                break;
+                            }
+                            el = el.parentElement;
+                        }
                     }
-                    if (target) {
-                        target.scrollTop = 0;
-                    }
-                    
-                    // Alternative: Select all scrollable containers and try to scroll the one intended
-                    var scrollables = window.parent.document.querySelectorAll(".st-emotion-cache-12fmw14.e1f1d6gn3"); 
-                    // Note: class names are unstable. Better to rely on structure if possible, but structure of StContainer is also tricky.
-                    // Let's try a broader selector for the specific container height
-                    var containers = window.parent.document.querySelectorAll('div[data-testid="stVerticalBlockBorderWrapper"]');
-                    if(containers.length >= 2) {
-                         var scroller = containers[1].querySelector('div[class*="st-emotion-cache"]'); // Common scrollable class prefix
-                         if(scroller) scroller.scrollTop = 0;
-                    }
-                }
-                
-                // Simpler, more robust approach given we are INSIDE the container:
-                // We can't easily reference "this" container from iframe. 
-                // Best effort: Scroll all vertical block wrappers that look like our chat container.
-                var wrappers = window.parent.document.querySelectorAll('div[data-testid="stVerticalBlockBorderWrapper"]');
-                wrappers.forEach(w => {
-                    // Check if height style matches ~750px (approx) or just scroll the second one
-                   if (w.style.height.includes("750px") || w.scrollHeight > 500) {
-                        // w.scrollTop = 0; // The wrapper itself might not be the scroll target
-                        var inner = w.querySelector('div[data-testid="stVerticalBlock"]');
-                        if(inner) inner.scrollTop = 0;
-                   }
-                });
-                
-                // Specific target for the LAST container which is likely ours (Chat)
-                var all_containers = window.parent.document.querySelectorAll('[data-testid="stVerticalBlockBorderWrapper"]');
-                if (all_containers.length > 0) {
-                    var last_container = all_containers[all_containers.length - 1];
-                    // The scrollbar is usually on the grandparent or parent of the content
-                    // Streamlit `st.container(height=...)` creates a scrollable wrapper.
-                    // Let's try to reset scrollTop on the element that has `overflow: auto` or `scroll`.
-                    
-                    // Brute force: find the container with height 750px
-                    var specific_container = Array.from(all_containers).find(el => el.style.height.includes("750px"));
-                    if(specific_container) {
-                        specific_container.scrollTop = 0;
-                        // Also try its children just in case
-                        var children = specific_container.querySelectorAll("div");
-                        children.forEach(c => c.scrollTop = 0);
-                    }
-                }
-
+                } catch(e) { console.log(e); }
             </script>
             '''
             components.html(js, height=0, width=0)
             st.session_state.scroll_to_top = False
+
 
         # Initialize Client
         api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -261,8 +241,10 @@ with col2:
 
             # Display turns in reverse order (Newest turn at the top)
             generation_placeholder = None
+            
             for turn_idx, turn in enumerate(reversed(turns)):
-                st.divider() # Visual separation between turns
+                # Within a turn, display messages in chronological order (Question -> Answer)
+
                 
                 # Within a turn, display messages in chronological order (Question -> Answer)
                 for msg_idx, msg in enumerate(turn):
@@ -293,13 +275,45 @@ with col2:
                                     on_click=jump_to_source,
                                     args=(src['title'], src['page'], pdf_files)
                                 )
+                        
+                        # Display Bad Button for Assistant
+                        if msg["role"] == "assistant" and "log_id" in msg:
+                            is_bad = msg.get("bad", False)
+                            btn_label = "Bad 👎 (Select)" if not is_bad else "Bad 👎 (Undo)"
+                            # Helper to maintain button state visually if needed, but simple button is provided
+                            # We use a unique key.
+                            
+                            # To make it look nicer, maybe put it in a small column or just below
+                            # Using checks or toggle button would be better but st.button is requested.
+                            
+                            b_col1, _ = st.columns([0.2, 0.8])
+                            with b_col1:
+                                st.button(
+                                    "👎 Bad",
+                                    key=f"bad_btn_{msg['log_id']}",
+                                    help="Mark this response as bad",
+                                    type="primary" if is_bad else "secondary",
+                                    on_click=handle_bad_feedback,
+                                    args=(msg['log_id'],)
+                                )
+                
+                # If this is the newest turn and it's incomplete (waiting for answer), secure placeholder here
+                if turn_idx == 0 and len(turn) == 1 and turn[0]["role"] == "user":
+                     generation_placeholder = st.empty()
+                
+                # Turn Divider
+                if turn_idx < len(turns) - 1: # Divider AFTER turn (visually below since reversed)
+                     # Wait, reversed order: Top is Newest.
+                     # Divider should be BELOW this turn.
+                     st.divider() 
 
-                if turn_idx == 0 and st.session_state.chat_history[-1]["role"] == "user":
-                    generation_placeholder = st.empty()
+
+
 
             if user_query:
                 # Add user message to history
                 st.session_state.chat_history.append({"role": "user", "content": user_query})
+
                 st.rerun() # Rerun to show the user message immediately via the loop above
 
             # Check if the last message was from user, if so, generate response
@@ -344,15 +358,25 @@ with col2:
                                                     page_num = int(page_match.group(1))
                                                     source_list.append({"title": title, "page": page_num})
                                 
-                                # Display Text
-                                st.markdown(response.text)
+
                                 
+                                # Create Log Entry
+                                log_entry = logger.create_log_entry(
+                                    question=st.session_state.chat_history[-1]["content"],
+                                    answer=response.text,
+                                    sources=source_list
+                                )
+                                logger.save_log(log_entry)
+
                                 # Save to history
                                 st.session_state.chat_history.append({
                                     "role": "assistant", 
                                     "content": response.text,
-                                    "sources": source_list
+                                    "sources": source_list,
+                                    "log_id": log_entry["id"],
+                                    "bad": False
                                 })
+                                
                                 
                                 # Auto-jump to the first source if available
                                 if source_list:
@@ -360,6 +384,11 @@ with col2:
                                     real_source = normalize_source_name(first_src['title'], pdf_files)
                                     if real_source in pdf_files:
                                         # Set pending jump for next run to avoid StreamlitAPIException
+                                        st.session_state.pending_auto_jump = {
+                                            'file': real_source,
+                                            'page': first_src['page']
+                                        }
+
                                         st.session_state.pending_auto_jump = {
                                             'file': real_source,
                                             'page': first_src['page']

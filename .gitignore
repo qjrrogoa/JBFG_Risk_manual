@@ -1,0 +1,20 @@
+
+# Data & Logs
+log/
+data/
+*.json
+*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.idea/
+.vscode/
+.DS_Store
+
+# Streamlit
+.streamlit/
