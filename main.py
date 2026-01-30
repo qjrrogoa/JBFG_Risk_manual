@@ -90,7 +90,7 @@ def jump_to_source(title: str, page: int, available_files: list):
         st.toast(f"Cannot find file: {title}")
 
 # 5. Layout
-col1, col2 = st.columns([0.6, 1])
+col1, col2 = st.columns([0.7, 1])
 
 # --- LEFT COLUMN: PDF Viewer ---
 with col1:
@@ -161,7 +161,7 @@ with col1:
                 pdf_path, 
                 sig=str(os.path.getsize(pdf_path)), 
                 page=st.session_state.current_page, 
-                dpi=500, 
+                dpi=300, 
             )
             st.image(img_bytes, use_container_width=True)
 
