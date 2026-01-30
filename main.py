@@ -15,7 +15,7 @@ from modules.pdf_processor import render_page, get_total_pages
 load_dotenv('../../etc/.env') # Adjust path if necessary, user provided '../../etc/.env'
 
 # 2. Configure Streamlit
-st.set_page_config(layout="wide", page_title="RAG v2 - Gemini File Search")
+st.set_page_config(layout="wide", page_title="업무 메뉴얼")
 
 # 3. Initialize Session State
 if "current_page" not in st.session_state:
@@ -104,11 +104,15 @@ with col1:
             selected_file = None
         else:
             # Default to first file or previously selected
-            idx = 0
-            if st.session_state.current_file in pdf_files:
-                idx = pdf_files.index(st.session_state.current_file)
+            # Ensure file_selector is valid (in options) and synced
+            current_selection = st.session_state.get("file_selector")
+            if current_selection not in pdf_files:
+                if st.session_state.current_file in pdf_files:
+                    st.session_state.file_selector = st.session_state.current_file
+                elif pdf_files:
+                    st.session_state.file_selector = pdf_files[0]
             
-            selected_file = st.selectbox("Select PDF File", pdf_files, index=idx, key="file_selector")
+            selected_file = st.selectbox("Select PDF File", pdf_files, key="file_selector")
             
             # Update session state if changed via selectbox
             if selected_file != st.session_state.current_file:
