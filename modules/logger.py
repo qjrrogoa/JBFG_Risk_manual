@@ -3,7 +3,8 @@ import os
 import uuid
 from datetime import datetime
 
-LOG_FILE = "log/chat_logs.json"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_FILE = os.path.join(BASE_DIR, "log", "chat_logs.json")
 
 def ensure_log_file():
     """Ensures the log file exists and initializes it if necessary."""
