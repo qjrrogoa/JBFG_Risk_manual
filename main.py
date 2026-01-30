@@ -169,14 +169,15 @@ with col1:
 with col2:
     st.header("🤖 Daemini")
     
-    with st.container(height=750):
+    with st.container(height=1500):
         # Trigger auto-scroll for this container if flag is set
         if st.session_state.get("scroll_to_top"):
             # This JS tries to find the second scrollable container (Index 1 usually matches the right column in 2-col layout)
             # and scrolls it to top.
             js = '''
             <script>
-                var candidates = window.parent.document.querySelectorAll('div[data-testid="stVerticalBlockBorderWrapper"]');
+                var candidates = window
+                .parent.document.querySelectorAll('div[data-testid="stVerticalBlockBorderWrapper"]');
                 if (candidates.length > 1) {
                     // Try to scroll the inner scrollable div of the second column container
                     var target = candidates[1].querySelector('div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]');
