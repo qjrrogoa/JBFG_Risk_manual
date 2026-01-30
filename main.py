@@ -157,23 +157,12 @@ with col1:
 
             # Render PDF
             # We can extract keywords from the last query for highlighting if needed
-            highlight_terms = []
-            if st.session_state.chat_history:
-                 last_query = st.session_state.chat_history[-1]["role"] == "user" and st.session_state.chat_history[-1]["content"] or ""
-                 # Actually, history order might be User, AI, User, AI. We want the last USER query.
-                 # Simple approach: grab terms from the input widget if possible, or just pass empty for now.
-                 # Let's try to grab from last user message in history.
-                 for msg in reversed(st.session_state.chat_history):
-                     if msg["role"] == "user":
-                         highlight_terms = extract_query_keywords(msg["content"])
-                         break
             
             img_bytes = render_page(
                 pdf_path, 
                 sig=str(os.path.getsize(pdf_path)), 
                 page=st.session_state.current_page, 
-                dpi=150, 
-                highlight_terms=tuple(highlight_terms)
+                dpi=250, 
             )
             st.image(img_bytes, use_container_width=True)
 

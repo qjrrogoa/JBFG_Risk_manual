@@ -23,27 +23,12 @@ def render_page(
     sig: str,
     page: int,
     dpi: int,
-    highlight_terms: Tuple[str, ...],
 ) -> bytes:
     doc = fitz.open(pdf_path)
     try:
         total = doc.page_count
         page = max(1, min(int(page), total))
         p = doc.load_page(page - 1)
-
-        for term in highlight_terms:
-            t = (term or "").strip()
-            if len(t) < 2:
-                continue
-            try:
-                rects = p.search_for(t)
-                for r in rects[:30]:
-                    try:
-                        p.add_highlight_annot(r)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
 
         pix = p.get_pixmap(dpi=int(dpi), annots=False)
         return pix.tobytes("png")
