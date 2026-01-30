@@ -161,7 +161,7 @@ with col1:
                 pdf_path, 
                 sig=str(os.path.getsize(pdf_path)), 
                 page=st.session_state.current_page, 
-                dpi=150, 
+                dpi=250, 
             )
             st.image(img_bytes, use_container_width=True)
 
