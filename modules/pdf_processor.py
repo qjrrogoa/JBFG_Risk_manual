@@ -34,7 +34,3 @@ def render_page(
         return pix.tobytes("png")
     finally:
         doc.close()
-
-
-
-

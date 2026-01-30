@@ -9,7 +9,6 @@ from google import genai
 from google.genai import types
 
 from dotenv import load_dotenv
-from modules.utils import extract_query_keywords
 from modules.pdf_processor import render_page, get_total_pages
 
 # 1. Load environment variables
@@ -162,7 +161,7 @@ with col1:
                 pdf_path, 
                 sig=str(os.path.getsize(pdf_path)), 
                 page=st.session_state.current_page, 
-                dpi=250, 
+                dpi=150, 
             )
             st.image(img_bytes, use_container_width=True)
 
